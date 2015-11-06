@@ -21,8 +21,8 @@ Main functions
     Get offsets using cross-correlation and fit offset function
   calc_fine_dem_lut:
     Refine lookup table
-  geocode:
-    Geocode products
+  geocode_dem:
+    Geocode products height products
 
 Contributors
 ============
@@ -50,7 +50,6 @@ import shutil
 import subprocess as subp
 import h5py as h5
 import numpy as np
-from utils import grep
 
 import pdb
 
@@ -111,9 +110,88 @@ def main(argv=None):
     calc_terrain_norm(datadir,masterdate)
     get_offset(datadir,masterdate)
     dem_width = calc_fine_dem_lut(datadir,masterdate)
-    geocode(datadir,masterdate,dem_width)
+    geocode_dem(datadir,masterdate,dem_width)
+    mliwidth, mlilength = geocode_mli(datadir,masterdate,dem_width)
+    get_look_vector(datadir,masterdate,dem_width,mliwidth,mlilength)
 
-def geocode(datadir,masterdate,dem_width):
+def get_look_vector(datadir,masterdate,dem_width,mliwidth,mlilength):
+    geodir = os.path.join(datadir,'Geo') 
+    slcdir = os.path.join(datadir,'SLC')
+
+    exe_str = 'look_vector {sd}/{md}/{md}.mli.par - {gd}/{md}.dem.par '.format(sd=slcdir,
+                                                                          md=masterdate,
+                                                                          gd=geodir)
+    exe_str += '{gd}/{md}.dem {gd}/theta {gd}/phi'.format(gd=geodir,
+                                                          md=masterdate)
+    os.system(exe_str)
+    
+    exe_str = 'geocode {gd}/{md}.lut_fine {gd}/theta {dw} '.format(gd=geodir,
+                                                                   md=masterdate,
+                                                                   dw=dem_width)
+    exe_str += '{gd}/theta_ifg {mw} {ml}'.format(gd=geodir,
+                                                 mw=mliwidth,
+                                                 ml=mlilength)
+    os.system(exe_str)
+
+    exe_str = 'geocode {gd}/{md}.lut_fine {gd}/phi {dw} '.format(gd=geodir,
+                                                                 md=masterdate,
+                                                                 dw=dem_width)
+    exe_str += '{gd}/phi_ifg {mw} {ml}'.format(gd=geodir,
+                                               mw=mliwidth,
+                                               ml=mlilength)
+    os.system(exe_str)
+
+    
+                                                                  
+    
+
+def geocode_mli(datadir,masterdate,dem_width):
+    geodir = os.path.join(datadir,'Geo')
+    dempar = os.path.join(geodir,masterdate+'.dem.par')
+    res = grep('corner_lat',dempar)
+    demlat = np.float32(res.split(':')[1].strip().split(' ')[0])
+    res = grep('corner_lon',dempar)
+    demlon = np.float32(res.split(':')[1].strip().split(' ')[0])
+    res = grep('post_lat',dempar) 
+    latstep = np.float32(res.split(':')[1].strip().split(' ')[0])
+    res = grep('post_lon',dempar) 
+    lonstep = np.float32(res.split(':')[1].strip().split(' ')[0])
+    res = grep('nlines',dempar) 
+    dem_length = np.int32(res.split(':')[1].strip())
+
+    mlipar = os.path.join(datadir,'SLC',masterdate,masterdate+'.mli.par')
+    res = grep('range_samples',mlipar)
+    mliwidth = np.int32(res.split(':')[1].strip())
+    res = grep('azimuth_lines',mlipar)
+    mlilength = np.int32(res.split(':')[1].strip())    
+    
+    lat = np.arange(demlat,demlat+dem_length*latstep,latstep)
+    lat = lat[:dem_length]
+    
+    lon = np.arange(demlon,demlon+dem_width*lonstep,lonstep)
+    lon = lon[:dem_width]
+
+    LON,LAT = np.meshgrid(lon,lat)
+    
+    np.float32(LON).byteswap().tofile(geodir+'/lon_dem')
+    np.float32(LAT).byteswap().tofile(geodir+'/lat_dem')
+    exe_str = 'geocode {0}/{1}.lut_fine {0}/lon_dem {2} {0}/lon_mli {3} {4}'.format(geodir,
+                                                                                   masterdate,
+                                                                                   dem_width,
+                                                                                   mliwidth,
+                                                                                   mlilength)
+    os.system(exe_str)
+    exe_str = 'geocode {0}/{1}.lut_fine {0}/lat_dem {2} {0}/lat_mli {3} {4}'.format(geodir,
+                                                                                   masterdate,
+                                                                                   dem_width,
+                                                                                   mliwidth,
+                                                                                   mlilength)
+    os.system(exe_str)
+    return mliwidth, mlilength
+
+
+
+def geocode_dem(datadir,masterdate,dem_width):
     mli = os.path.join(datadir,'SLC',masterdate,masterdate+'.mli')
     geodir=os.path.join(datadir,'Geo')
     res = grep('range_samples','{mli}.par'.format(mli=mli))
@@ -225,6 +303,9 @@ def calc_terrain_norm(datadir,masterdate):
     os.system(exe_str)
     
                         
+def grep(arg,file):
+    res = subp.check_output(['grep',arg,file])
+    return res
 
 
 
