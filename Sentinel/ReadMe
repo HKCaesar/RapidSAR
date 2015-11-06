@@ -1,0 +1,22 @@
+Database setup and usage
+========================
+
+sqlite3 -echo </path/to/db/dbname> < init_S1_db.sql
+sqlite3 -echo </path/to/orbit/db/orbitdbname < init_orbit_db.sql
+
+S1_insert_db.py -d </path/to/.SAFE/directory/> -o </path/to/database/file>
+
+S1_insert_orbit_db.py -d </path/to/orbit/files/> -o </path/to/orbit/database/file>
+
+S1_find_data.py -d </path/to/target/directory/> -q </path/to/query/file> -u <scihub username> -p <scihub password> -x </path/to/xmlfile>
+
+S1_query_db.py -d </path/to/database/file> -q </path/to/query/file> -o </path/to/output/directory/>
+
+Process single master timeseries
+================================
+
+S1_setup_image.py -d </path/to/database/file> -o </path/to/processing/directory>
+
+S1_setup_master.py -d </path/to/processing/directory> -m <masterdate YYYYMMDD> -e </path/to/dem>
+
+S1_process_slaves.py -d </path/to/processing/directory

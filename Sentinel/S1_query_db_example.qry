@@ -1,0 +1,5 @@
+# Range of dates to search for, inclusive
+DATERANGE:		20151016 20151020
+# Opposite corners of box to search data in
+POLYGON:			-18 65 -15 66
+
