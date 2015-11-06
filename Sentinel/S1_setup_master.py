@@ -23,6 +23,16 @@ Main functions
     Refine lookup table
   geocode_dem:
     Geocode products height products
+  geocode_mli:
+    Geocode mli image
+  get_look_vector:
+    Calculates the angles of the look vector
+
+Aux functions
+-------------
+  
+  grep:
+    Mimics grep shell command
 
 Contributors
 ============
