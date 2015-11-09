@@ -28,12 +28,6 @@ Main functions
   get_look_vector:
     Calculates the angles of the look vector
 
-Aux functions
--------------
-  
-  grep:
-    Mimics grep shell command
-
 Contributors
 ============
 
@@ -60,6 +54,7 @@ import shutil
 import subprocess as subp
 import h5py as h5
 import numpy as np
+from RIMoDe.utils import grep
 
 import pdb
 
@@ -312,11 +307,6 @@ def calc_terrain_norm(datadir,masterdate):
     
     os.system(exe_str)
     
-                        
-def grep(arg,file):
-    res = subp.check_output(['grep',arg,file])
-    return res
-
 
 
 if __name__ == "__main__":

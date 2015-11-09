@@ -6,10 +6,10 @@ import subprocess as subp
 import sqlite3
 import datetime as dt
 import numpy as np
-from S1_insert_db import db_insert
-from S1_setup_images import make_image
-from S1_process_slaves import process_slave, get_swath_pol
-from utils import grep
+from RIMoDe.Sentinel.S1_insert_db import db_insert
+from RIMoDe.Sentinel.S1_setup_images import make_image
+from RIMoDe.Sentinel.S1_process_slaves import process_slave, get_swath_pol
+from RIMoDe.utils import grep
 
 try:
     import xml.etree.cElementTree as ET

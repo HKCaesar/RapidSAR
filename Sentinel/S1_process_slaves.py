@@ -32,8 +32,8 @@ import subprocess as subp
 import h5py as h5
 import numpy as np
 import datetime as dt
-from utils import grep
-from S1_setup_image import make_SLC_tab
+from RIMoDe.utils import grep
+from RIMoDe.Sentinel.S1_setup_image import make_SLC_tab
 
 import pdb
 
