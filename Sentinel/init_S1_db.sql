@@ -31,3 +31,8 @@ CREATE TABLE files_bursts (
        burst_id TEXT,
        burst_no INTEGER -- Burst number in file, needed for Gamma
 );
+
+CREATE TABLE tracks_procdirs (
+       track INTEGER,
+       proc_dir TEXT
+);

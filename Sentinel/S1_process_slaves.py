@@ -117,36 +117,39 @@ def main(argv=None):
     mliwidth = np.int32(res.split(':')[1].strip())
 
     for i in sortix:
-        derive_lut(datadir,masterdate.strftime('%Y%m%d'),slavelist[i].strftime('%Y%m%d'),swathlist,pol)
-        calc_offset(datadir,masterdate.strftime('%Y%m%d'),slavelist[i].strftime('%Y%m%d'))
-        if abs(tempbaseline[i]) <= dt.timedelta(days=60):
-            coreg_overlap(datadir,masterdate.strftime('%Y%m%d'),slavelist[i].strftime('%Y%m%d'),[],1)
-            coreg_overlap(datadir,masterdate.strftime('%Y%m%d'),slavelist[i].strftime('%Y%m%d'),[],2)
-        else:
-            auxtab = get_auxtab(datadir,slavelist[i],masterdate,swathlist,pol)
-#            procslavelist = []
-#            for l in os.listdir(os.path.join(datadir,'SLC')):
-#                if len(l) == 8 and l != slavelist[i].strftime('%Y%m%d') and l[0] == '2':
-#                    procslavelist.append(dt.datetime(int(l[:4]),int(l[4:6]),int(l[6:])))
-#                    procbaseline = [abs(slavelist[i]-sd) for sd in procslavelist]
-#            if min(procbaseline) < abs(slavelist[i]-masterdate):
-#                auxdate = procslavelist[np.argsort(procbaseline)[0]]
-#                auxtab = os.path.join(datadir,'RSLC3_tab')
-#                make_SLC_tab(os.path.join(datadir,'RSLC3_tab'),
-#                             os.path.join(datadir,'RSLC',
-#                                          auxdate.strftime('%Y%m%d')),
-#                             swathlist,pol)
-            coreg_overlap(datadir,masterdate.strftime('%Y%m%d'),slavelist[i].strftime('%Y%m%d'),auxtab,1)
-            coreg_overlap(datadir,masterdate.strftime('%Y%m%d'),slavelist[i].strftime('%Y%m%d'),auxtab,2)
-        make_ifg(datadir,masterdate.strftime('%Y%m%d'),slavelist[i].strftime('%Y%m%d'),mliwidth)
+        process_slave(datadir,masterdate.strftime('%Y%m%d'),slavelist[i].strftime('%Y%m%d'),tempbaseline[i],swathlist,pol,mliwidth)
+
+
+def process_slave(datadir,masterdate,slavedate,masterbaseline,swathlist,pol,mliwidth):
+    derive_lut(datadir,masterdate,slavedate,swathlist,pol)
+    calc_offset(datadir,masterdate,slavedate)
+    if masterbaseline <= dt.timedelta(days=60):
+        #No auxiliary image used if tempbaseline is less than 60 days
+        coreg_overlap(datadir,masterdate,slavedate,[],1)
+        coreg_overlap(datadir,masterdate,slavedate,[],2)
+    else:
+        auxtab = get_auxtab(datadir,slavedate,masterdate,swathlist,pol)
+        coreg_overlap(datadir,masterdate,slavedate,auxtab,1)
+        coreg_overlap(datadir,masterdate,slavedate,auxtab,2)
+    make_ifg(datadir,masterdate,slavedate,mliwidth)
+
+def get_slave_list(datadir,masterdate):
+    slavelist = []
+    for l in os.listdir(os.path.join(datadir,'RSLC')):
+            if l != str(masterdate) and l[0] == '2' and len(l) == 8:
+                slavelist.append(dt.datetime(int(l[:4]),int(l[4:6]),int(l[6:])))
+    return slavelist
 
 def get_auxtab(datadir,slavedate,masterdate,swathlist,pol):
     procslavelist = []
-    for l in os.listdir(os.path.join(datadir,'SLC')):
-        if len(l) == 8 and l != slavedate.strftime('%Y%m%d') and l[0] == '2':
+    slavedate_dt = dt.datetime(int(slavedate[:4]),int(slavedate[4:6]),int(slavedate[6:]))
+    masterdate_dt = dt.datetime(int(masterdate[:4]),int(masterdate[4:6]),int(masterdate[6:]))
+    for l in os.listdir(os.path.join(datadir,'RSLC')):
+        if len(l) == 8 and l != slavedate and l[0] == '2':
             procslavelist.append(dt.datetime(int(l[:4]),int(l[4:6]),int(l[6:])))
-            procbaseline = [abs(slavedate-sd) for sd in procslavelist]
-    if min(procbaseline) < abs(slavedate-masterdate):
+    
+    procbaseline = [abs(slavedate_dt-sd) for sd in procslavelist]
+    if min(procbaseline) < abs(slavedate_dt-masterdate_dt):
         auxdate = procslavelist[np.argsort(procbaseline)[0]]
         auxtab = os.path.join(datadir,'RSLC3_tab')
         make_SLC_tab(os.path.join(datadir,'RSLC3_tab'),
@@ -154,6 +157,8 @@ def get_auxtab(datadir,slavedate,masterdate,swathlist,pol):
                                   auxdate.strftime('%Y%m%d'),
                                   auxdate.strftime('%Y%m%d')),
                      swathlist,pol)
+    else:
+        auxtab = []
     return auxtab
 
 def make_ifg(datadir,masterdate,slavedate,mliwidth):

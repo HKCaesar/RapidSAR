@@ -90,7 +90,7 @@ def main(argv=None):
     dirlist.sort()
     for d in dirlist:
         if os.path.isdir(os.path.join(datadir,d)) and d[-5:] == '.SAFE':
-            c, conn = db_insert(os.path.join(datadir,d),c,conn)
+            db_insert(os.path.join(datadir,d),c,conn)
     conn.close()
 
 def db_insert(S1dir,c,conn):
@@ -98,12 +98,6 @@ def db_insert(S1dir,c,conn):
     orbitno = get_orbit(S1dir)
     for f in filelist:
         if f[-4:] != 'tiff':
-            continue
-
-        c.execute('SELECT * FROM files WHERE id=\"{0}\"'.format(f))
-        res = c.fetchall()
-        if res:
-            print 'File {0} already in database, skipping...'.format(f)
             continue
  
         annotfilename = os.path.join(S1dir,'annotation',f.split('.')[0]+'.xml')
@@ -113,6 +107,14 @@ def db_insert(S1dir,c,conn):
         orbitdir = root.find('generalAnnotation').find('productInformation').find('pass').text
         sensdate = root.find('adsHeader').find('startTime').text[:10].split('-')
         sensdate = sensdate[0]+sensdate[1]+sensdate[2]
+
+        # Check if file is in database already
+        c.execute('SELECT * FROM files WHERE id=\"{0}\"'.format(f))
+        res = c.fetchall()
+        if res:
+            print 'File {0} already in database, skipping...'.format(f)
+            continue
+
         exe_str = 'INSERT INTO files '+\
                   '(id, directory, track, '+\
                   'orbit_direction, swath, pol, date) '+\
@@ -209,7 +211,8 @@ def db_insert(S1dir,c,conn):
             
             c.execute(exe_str)
             conn.commit()
-    return c, conn
+    
+    return sensdate
                        
 def get_orbit(datadir):
     manifestfile = os.path.join(datadir,'manifest.safe')

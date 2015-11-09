@@ -3,7 +3,13 @@ import getopt
 import os
 import shutil
 import subprocess as subp
+import sqlite3
+import datetime as dt
+import numpy as np
 from S1_insert_db import db_insert
+from S1_setup_images import make_image
+from S1_process_slaves import process_slave, get_swath_pol
+from utils import grep
 
 try:
     import xml.etree.cElementTree as ET
@@ -34,10 +40,11 @@ def main(argv=None):
     queryfile = []
     xmlfile = []
     datadir = []
-
+    procflag = False
+    
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hd:i:", ["help"])
+            opts, args = getopt.getopt(argv[1:], "hd:i:p", ["help"])
         except getopt.error, msg:
             raise Usage(msg)
         for o, a in opts:
@@ -48,6 +55,8 @@ def main(argv=None):
                 datadir = a
             elif o == '-i':
                 hopperdir = a
+            elif o == '-p':
+                procflag = True
 
         if not os.path.exists(hopperdir):
             raise Usage('Hopper directory {0} does not exist.'.format(datadir))
@@ -70,14 +79,43 @@ def main(argv=None):
     with open(os.path.join(hopperdir,'failed.list'),'a') as f:
         for l in failed_list:
             f.write('{0}\n'.format(l))
+
+    # BEWARE: database filenames hardcoded below!!!!
     dbfilename = '/nfs/a1/raw/sentinel/iceland/S1_iceland.sql'
+    orbitdbfilename = '/nfs/a1/raw/sentinel/iceland/S1_orbits.sql'
+
     conn = sqlite3.connect(dbfilename)
     c = conn.cursor()
-    distribute_data(datadir,hopperdir,c,conn)
+    tracklist, datelist = distribute_data(datadir,hopperdir,c,conn)
+
+    if procflag:
+        for t in set(tracklist):
+            slavedate = [sd for tt,sd in zip(tracklist,datelist) if tt == t][0]
+            query = 'SELECT proc_dir FROM tracks_procdirs WHERE track = {0}'.format(t)
+            c.execute(query)
+            res = c.fetchall()
+            slavedate_dt = dt.datetime(int(slavedate[:4]),int(slavedate[4:6]),int(slavedate[6:]))
+            if res:
+                for procdir in res[0]:
+                    with open(os.path.join(procdir,'burstid.list')) as f:
+                        burstidlist = f.read().strip().split('\n')
+                    make_image(procdir,burstidlist,slavedate,c,orbitdbfilename)
+                    for f in os.listdir(os.path.join(procdir,'Geo')):
+                        if f[-4:] == '.dem' and f[0] == '2':
+                            masterdate = f.split('.')[0]
+                            masterdate_dt = dt.datetime(int(masterdate[:4]),int(masterdate[4:6]),int(masterdate[6:]))
+                            break
+                    masterbaseline = abs(masterdate_dt-slavedate_dt)
+                    swathlist, pol = get_swath_pol(procdir,masterdate)
+                    res = grep('range_samples',os.path.join(procdir,'SLC',masterdate,'{md}.mli.par'.format(md=masterdate)))
+                    mliwidth = np.int32(res.split(':')[1].strip())
+                    process_slave(procdir,masterdate,slavedate,masterbaseline,swathlist,pol,mliwidth)
     conn.close()
 
 def distribute_data(datadir,hopperdir,c,conn):
     datalist = os.listdir(hopperdir)
+    tracklist = []
+    datelist = []
     for d in datalist:
         if os.path.isdir(os.path.join(hopperdir,d)) and d[-5:] == '.SAFE':
             orbnumber = get_orbit(os.path.join(hopperdir,d))
@@ -88,7 +126,10 @@ def distribute_data(datadir,hopperdir,c,conn):
                 shutil.move(os.path.join(hopperdir,d),orbdir)
             else:
                 print 'WARNING: Data directory {0} already in destination directory {1}'.format(d,orbdir)
-            db_insert(os.path.join(orbdir,d),c,conn)
+            sensdate = db_insert(os.path.join(orbdir,d),c,conn)
+            datelist.append(sensdate)
+            tracklist.append(orbnumber)
+    return tracklist, datelist
             
 
 def get_orbit(datadir):
