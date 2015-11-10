@@ -52,6 +52,7 @@ import sys
 import getopt
 import os
 import subprocess as subp
+import sqlite3
 
 try:
     import xml.etree.cElementTree as ET
@@ -116,23 +117,34 @@ def main(argv=None):
         if rc > 0:
             print 'Something went wrong performing the query, exiting.'
             return 1
-    
+    dbfilename = '/nfs/a1/raw/sentinel/iceland/S1_iceland.sql'
     downloadlist = parse_xml(xmlfile)
     if datadir:
-        get_data(datadir,downloadlist,username,password)
+        get_data(datadir,downloadlist,username,password,dbfilename)
 
 
-def get_data(ddir,dl,un,pw):
+def get_data(ddir,dl,un,pw,dbfile):
     total = len(dl)
+    dllist = []
     for i,e in enumerate(dl):
         filename = ddir+'/'+e['id']+'.zip'
         if os.path.exists(filename):
             print '{0} already exists.'.format(filename)
             continue
+        conn = sqlite3.connect(dbfile)
+        c = conn.cursor()
+        query = 'SELECT * FROM files WHERE directory LIKE \"%{0}.SAFE\"'.format(e['id'])
+        c.execute(query)
+        res = c.fetchall()
+        if res:
+            print '{0}.SAFE is already in the database!'.format(e['id'])
+            continue
         url = e['link'].strip('\"')
         dlcall = ['wget','--no-check-certificate','--user',un,'--password',pw,'-O',filename,url]
         print '\nDownloading {0} ({1} of {2})\n'.format(e['id'],i+1,total)
         rc = subp.call(dlcall)
+        dllist.append(e['id'])
+    return dllist
 
 
 
