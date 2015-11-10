@@ -113,14 +113,14 @@ def main(argv=None):
     tempbaseline = [abs(masterdate-sd) for sd in slavelist] 
     sortix = np.argsort(tempbaseline)
     swathlist, pol = get_swath_pol(datadir,masterdate.strftime('%Y%m%d'))
-    res = grep('range_samples',os.path.join(datadir,'SLC',masterdate.strftime('%Y%m%d'),'{md}.slc.par'.format(md=masterdate.strftime('%Y%m%d'))))
-    width = np.int32(res.split(':')[1].strip())
+    res = grep('range_samples',os.path.join(datadir,'SLC',masterdate.strftime('%Y%m%d'),'{md}.mli.par'.format(md=masterdate.strftime('%Y%m%d'))))
+    mliwidth = np.int32(res.split(':')[1].strip())
 
     for i in sortix:
-        process_slave(datadir,masterdate.strftime('%Y%m%d'),slavelist[i].strftime('%Y%m%d'),tempbaseline[i],swathlist,pol,width)
+        process_slave(datadir,masterdate.strftime('%Y%m%d'),slavelist[i].strftime('%Y%m%d'),tempbaseline[i],swathlist,pol,mliwidth)
 
 
-def process_slave(datadir,masterdate,slavedate,masterbaseline,swathlist,pol,width):
+def process_slave(datadir,masterdate,slavedate,masterbaseline,swathlist,pol,mliwidth):
     derive_lut(datadir,masterdate,slavedate,swathlist,pol)
     calc_offset(datadir,masterdate,slavedate)
     if masterbaseline <= dt.timedelta(days=60):
@@ -131,7 +131,7 @@ def process_slave(datadir,masterdate,slavedate,masterbaseline,swathlist,pol,widt
         auxtab = get_auxtab(datadir,slavedate,masterdate,swathlist,pol)
         coreg_overlap(datadir,masterdate,slavedate,auxtab,1)
         coreg_overlap(datadir,masterdate,slavedate,auxtab,2)
-    make_ifg(datadir,masterdate,slavedate,width)
+    make_ifg(datadir,masterdate,slavedate,mliwidth)
 
 def get_slave_list(datadir,masterdate):
     slavelist = []
@@ -141,9 +141,13 @@ def get_slave_list(datadir,masterdate):
     return slavelist
 
 def get_auxtab(datadir,slavedate,masterdate,swathlist,pol):
+    procslavelist = []
     slavedate_dt = dt.datetime(int(slavedate[:4]),int(slavedate[4:6]),int(slavedate[6:]))
     masterdate_dt = dt.datetime(int(masterdate[:4]),int(masterdate[4:6]),int(masterdate[6:]))
-    procslavelist = get_slave_list(datadir,masterdate)
+    for l in os.listdir(os.path.join(datadir,'RSLC')):
+        if len(l) == 8 and l != slavedate and l[0] == '2':
+            procslavelist.append(dt.datetime(int(l[:4]),int(l[4:6]),int(l[6:])))
+    
     procbaseline = [abs(slavedate_dt-sd) for sd in procslavelist]
     if min(procbaseline) < abs(slavedate_dt-masterdate_dt):
         auxdate = procslavelist[np.argsort(procbaseline)[0]]
@@ -157,7 +161,7 @@ def get_auxtab(datadir,slavedate,masterdate,swathlist,pol):
         auxtab = []
     return auxtab
 
-def make_ifg(datadir,masterdate,slavedate,width):
+def make_ifg(datadir,masterdate,slavedate,mliwidth):
     slcdir = os.path.join(datadir,'SLC')
     rslcdir = os.path.join(datadir,'RSLC')
     geodir = os.path.join(datadir,'Geo')
@@ -193,11 +197,11 @@ def make_ifg(datadir,masterdate,slavedate,width):
                                                               sld=slavedate)
 
     os.system(exe_str)
-    exe_str = 'rasmph_pwr {ifd}/{md}_{sld}.diff {sd}/{md}/{md}.slc {mw}'.format(ifd=ifgdir,
+    exe_str = 'rasmph_pwr {ifd}/{md}_{sld}.diff {sd}/{md}/{md}.mli {mw}'.format(ifd=ifgdir,
                                                                                 md=masterdate,
                                                                                 sld=slavedate,
                                                                                 sd=slcdir,
-                                                                                mw=width)
+                                                                                mw=mliwidth)
     os.system(exe_str)
                                                                           
 
