@@ -223,8 +223,8 @@ def make_image(destdir, burstidlist, date, c, orbitdb):
                 
                 
     make_SLC_tab(tabname,filename,sorted(set(swathlist)),pol)
-    multi_TOPS(tabname,filename,1,1)
-    mosaic_TOPS(tabname,filename,5,1)
+    multi_TOPS(tabname,filename,5,1)
+    mosaic_TOPS(tabname,filename,1,1)
     apply_precise_orbit(filename,orbitdb,date,timethis)
 
         
