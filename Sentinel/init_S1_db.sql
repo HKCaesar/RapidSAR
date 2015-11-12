@@ -36,3 +36,5 @@ CREATE TABLE tracks_procdirs (
        track INTEGER,
        proc_dir TEXT
 );
+
+INSERT INTO tracks_procdirs VALUES (111,"/nfs/a1/insar/sentinel1/Iceland/VatnaNVZDesc/");

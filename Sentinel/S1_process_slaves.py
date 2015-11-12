@@ -33,7 +33,7 @@ import h5py as h5
 import numpy as np
 import datetime as dt
 from RIMoDe.utils import grep
-from RIMoDe.Sentinel.S1_setup_images import make_SLC_tab
+from RIMoDe.Sentinel.S1_setup_images import make_SLC_tab, multi_TOPS, get_par_data
 
 import pdb
 
@@ -122,7 +122,8 @@ def main(argv=None):
 
 def process_slave(datadir,masterdate,slavedate,masterbaseline,swathlist,pol,mliwidth):
     derive_lut(datadir,masterdate,slavedate,swathlist,pol)
-    calc_offset(datadir,masterdate,slavedate)
+    calc_offset(datadir,masterdate,slavedate,'')
+    calc_offset(datadir,masterdate,slavedate,1)
     if masterbaseline <= dt.timedelta(days=60):
         #No auxiliary image used if tempbaseline is less than 60 days
         coreg_overlap(datadir,masterdate,slavedate,[],1)
@@ -131,7 +132,18 @@ def process_slave(datadir,masterdate,slavedate,masterbaseline,swathlist,pol,mliw
         auxtab = get_auxtab(datadir,slavedate,masterdate,swathlist,pol)
         coreg_overlap(datadir,masterdate,slavedate,auxtab,1)
         coreg_overlap(datadir,masterdate,slavedate,auxtab,2)
+    multilook_rslc(datadir,slavedate,mliwidth)
     make_ifg(datadir,masterdate,slavedate,mliwidth)
+
+def multilook_rslc(datadir,slavedate,mliwidth):
+    rslcdir = os.path.join(datadir,'RSLC',slavedate)
+    rslcwidth = get_par_data(os.path.join(rslcdir,slavedate+'.rslc.par'),'range_samples')
+    exe_str = 'multi_look {rd}/{sld}.rslc {rd}/{sld}.rslc.par {rd}/{sld}.mli {rd}/{sld}.mli.par 5 1'.format(rd=rslcdir,sld=slavedate)
+    os.system(exe_str)
+    exe_str = 'raspwr {rd}/{sld}.mli {mw}'.format(rd=rslcdir,
+                                                  sld=slavedate,
+                                                  mw=mliwidth)
+    os.system(exe_str)
 
 def get_slave_list(datadir,masterdate):
     slavelist = []
@@ -209,7 +221,7 @@ def coreg_overlap(datadir,masterdate,slavedate,auxtab,specdivno):
     slcdir = os.path.join(datadir,'SLC')
     rslcdir = os.path.join(datadir,'RSLC')
     if specdivno == 1:
-        cor=''
+        cor='1'
     else:
         cor = '.cor{0}'.format(specdivno-1)
     exe_str = 'S1_coreg_overlap {dd}/SLC1_tab {dd}/RSLC2_tab {md}_{sld} '.format(dd=datadir,
@@ -232,16 +244,17 @@ def coreg_overlap(datadir,masterdate,slavedate,auxtab,specdivno):
                                                                                  sn=specdivno))
             
 
-def calc_offset(datadir,masterdate,slavedate):
+def calc_offset(datadir,masterdate,slavedate,offno):
     slcdir = os.path.join(datadir,'SLC')
     rslcdir = os.path.join(datadir,'RSLC')    
 
     exe_str = 'create_offset {sd}/{md}/{md}.slc.par '.format(sd=slcdir,
                                                              md=masterdate)
-    exe_str += '{sd}/{sld}/{sld}.slc.par {rd}/{md}_{sld}.off 1 5 1 0'.format(sd=slcdir,
-                                                                             sld=slavedate,
-                                                                             rd=rslcdir,
-                                                                             md=masterdate)
+    exe_str += '{sd}/{sld}/{sld}.slc.par {rd}/{md}_{sld}.off{on} 1 5 1 0'.format(sd=slcdir,
+                                                                                 sld=slavedate,
+                                                                                 rd=rslcdir,
+                                                                                 md=masterdate,
+                                                                                 on=offno)                                                                             
     os.system(exe_str)
 
     exe_str = 'offset_pwr {sd}/{md}/{md}.slc {rd}/{sld}/{sld}.rslc '.format(sd=slcdir,
@@ -252,9 +265,10 @@ def calc_offset(datadir,masterdate,slavedate):
                                                                           md=masterdate,
                                                                           rd=rslcdir,
                                                                           sld=slavedate)
-    exe_str += '{rd}/{md}_{sld}.off {rd}/{md}_{sld}.offs '.format(rd=rslcdir,
-                                                                  md=masterdate,
-                                                                  sld=slavedate)
+    exe_str += '{rd}/{md}_{sld}.off{on} {rd}/{md}_{sld}.offs '.format(rd=rslcdir,
+                                                                      md=masterdate,
+                                                                      sld=slavedate,
+                                                                      on=offno)
     exe_str += '{rd}/{md}_{sld}.snr 256 64 - 1 64 64 7.0 4 0 0'.format(rd=rslcdir,
                                                                        md=masterdate,
                                                                        sld=slavedate)
@@ -264,13 +278,15 @@ def calc_offset(datadir,masterdate,slavedate):
     exe_str = 'offset_fit {rd}/{md}_{sld}.offs {rd}/{md}_{sld}.snr '.format(rd=rslcdir,
                                                                             md=masterdate,
                                                                             sld=slavedate)
-    exe_str += '{rd}/{md}_{sld}.off - - 10.0 1 0'.format(rd=rslcdir,
-                                                         md=masterdate,
-                                                         sld=slavedate)
+    exe_str += '{rd}/{md}_{sld}.off{on} - - 10.0 1 0'.format(rd=rslcdir,
+                                                             md=masterdate,
+                                                             sld=slavedate,
+                                                             on=offno)
     os.system(exe_str)
-    SLC_interp(datadir,masterdate,slavedate,'{rd}/{md}_{sld}.off'.format(rd=rslcdir,
-                                                                         md=masterdate,
-                                                                         sld=slavedate))
+    SLC_interp(datadir,masterdate,slavedate,'{rd}/{md}_{sld}.off{on}'.format(rd=rslcdir,
+                                                                             md=masterdate,
+                                                                             sld=slavedate,
+                                                                             on=offno))
                                                                 
             
 def get_swath_pol(datadir,masterdate):
