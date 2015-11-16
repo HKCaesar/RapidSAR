@@ -1,22 +1,43 @@
-Database setup and usage
+These scripts are used to search, download and process Sentinel data. The below overview provides a basic overview of the workflow going from obtaining the data to making the single master interferograms.
+
+Database setup, data download and database searching
 ========================
 
-sqlite3 -echo </path/to/db/dbname> < init_S1_db.sql
-sqlite3 -echo </path/to/orbit/db/orbitdbname < init_orbit_db.sql
+If starting from scratch, two databases have to be set up. The first database holds information on files, tracks and bursts, and their interrelationship. The second database contains the precise and restituted orbit files. To initialize these databases, run:
 
-S1_insert_db.py -d </path/to/.SAFE/directory/> -o </path/to/database/file>
+> sqlite3 -echo </path/to/db/dbname> < init_S1_db.sql
+> sqlite3 -echo </path/to/orbit/db/orbitdbname < init_orbit_db.sql
 
-S1_insert_orbit_db.py -d </path/to/orbit/files/> -o </path/to/orbit/database/file>
+To insert data into the database, the script S1_insert_db.py. This script needs to be pointed to the directory containing Sentinel .Safe directories. It will then cycle through each directory and enter the relevant info into the database:
 
-S1_find_data.py -d </path/to/target/directory/> -q </path/to/query/file> -u <scihub username> -p <scihub password> -x </path/to/xmlfile>
+> S1_insert_db.py -d </path/to/dir/containing/.Safe/directories/> -o </path/to/database/file>
 
-S1_query_db.py -d </path/to/database/file> -q </path/to/query/file> -o </path/to/output/directory/>
+Inserting orbit files into the database works very similarly to the above script. Point the script to the directory containing the .EOF files.
+
+> S1_insert_orbit_db.py -d </path/to/orbit/files/> -o </path/to/orbit/database/file>
+
+The Sentinel SciHub is searched using the S1_find_data.py script. The search parameters are given by the file given using the -q option, an example is given in the S1_query_db_example.qry file. If the -d option is given, the data will be downloaded (one file at a time). Typically, the destination directory will be a Hopper, from which the data can be distributed using the S1_clear_hopper.py script. This script extracts the zip files, extracts relevant info, and distribute to correct track directory.
+
+> S1_find_data.py -d </path/to/target/directory/> -q </path/to/query/file> -u <scihub username> -p <scihub password> -x </path/to/xmlfile>
+
+> S1_clear_hopper.py -d </path/to/track/dir/location> -i </path/to/hopper/dir>
+
+The local database can be searched using the S1_query_db.py script. This script takes a query file similar to the example given above, and outputs two lists. The first list contains all the bursts within the search area. This list can be manually adapted to suit the users needs. The second list contains all the dates which have an image available. These two lists will be located in the output directory, in which it is assumed the single master timeseries processing will be done.
+
+> S1_query_db.py -d </path/to/database/file> -q </path/to/query/file> -o </path/to/output/directory/>
 
 Process single master timeseries
 ================================
 
-S1_setup_image.py -d </path/to/database/file> -o </path/to/processing/directory>
+Processing the single master timeseries is split into three stages. The first script, S1_setup_images.py, extracts for each date in date.list the bursts contained in burstids.list. If any burst is not available for a certain date, this date is skipped. 
 
-S1_setup_master.py -d </path/to/processing/directory> -m <masterdate YYYYMMDD> -e </path/to/dem>
+> S1_setup_images.py -d </path/to/database/file> -o </path/to/processing/directory>
 
-S1_process_slaves.py -d </path/to/processing/directory
+The second stage is to choose a master from the processed images, and to perform the geocoding of this master. This is achieved by using the script S1_setup_master.py:
+
+> S1_setup_master.py -d </path/to/processing/directory> -m <masterdate YYYYMMDD> -e </path/to/dem>
+
+The final stage is to co-register all the slaves in turn, and generating the differential interferograms. This is handled by the S1_process_slaves.py:
+
+> S1_process_slaves.py -d </path/to/processing/directory
+
